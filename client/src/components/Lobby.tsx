@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { socket } from '../socket';
+import { PlayerListItem } from './PlayerListItem';
 
 const LobbyContainer = styled.div`
   display: flex;
@@ -78,14 +80,16 @@ type Role = 'Mayor' | 'Escort' | 'Transporter' | 'Medium' | 'Retributionist' | '
 interface Player {
   id: string;
   nickname: string;
+  role: Role;
+  isHost: boolean;
 }
 
-// Dummy data for player list and roles
-const MOCK_PLAYERS: Player[] = [
-  { id: 'p1', nickname: 'GameMaster' },
-  { id: 'p2', nickname: 'Joker' },
-  { id: 'p3', nickname: 'Sleeper' },
-];
+interface RoomState {
+  hostId: string;
+  status: 'LOBBY' | 'NIGHT' | 'DAY';
+  roles: Role[];
+  players: Player[];
+}
 
 const STARTER_ROLES: Role[] = ['Mayor', 'Veteran', 'Doctor', 'Lookout', 'Sheriff', 'Godfather', 'Mafioso', 'Jester', 'Survivor'];
 const roleOptions = ['Mayor', 'Escort', 'Transporter', 'Medium', 'Retributionist', 'Lookout', 'Sheriff', 'Veteran', 'Vigilante', 'Bodyguard', 'Doctor', 'Consigliere',
@@ -104,9 +108,9 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
   const [newRole, setNewRole] = useState<Role>('Town');
   
   // Validation: Check if player count matches role count
-  const playerCount = players.length;
+  const playerCount = players.length - 1; // we don't count GM as player
   const roleCount = roles.length;
-  const canStartGame = playerCount === roleCount && playerCount >= 2; // Min players check
+  const canStartGame = playerCount === roleCount && playerCount >= 7; // Min players check
 
   const handleAddRole = () => {
     setRoles(prev => [...prev, newRole]);
@@ -118,8 +122,8 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
   
   // Visual Feedback based on validation
   const validationText = 
-    playerCount < 2 
-      ? 'Need at least 2 players to start.' 
+    playerCount < 8 
+      ? 'Need at least 7 players to start.' 
       : (playerCount !== roleCount 
         ? `Player Count (${playerCount}) ≠ Role Count (${roleCount})` 
         : 'Ready to Start!');
@@ -132,7 +136,9 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
       
       <h4>Players ({playerCount})</h4>
       <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
-        {players.map(p => <div key={p.id}>{p.nickname}</div>)}
+        {players.map(p => (
+            <PlayerListItem key={p.id} player={p} />
+        ))}
       </div>
 
       <h4>Role List ({roleCount})</h4>
@@ -155,8 +161,7 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
           style={{ padding: '10px', flexGrow: 1, backgroundColor: '#1a1a2e', color: 'white' }}
         >
           {roleOptions.map((r, index) => {
-            console.log(r);
-            return(<option value={r}>{r}</option>)
+            return(<option key={r} value={r}>{r}</option>)
           })}
         </select>
         <button onClick={handleAddRole} style={{ padding: '10px', background: '#9C27B0' }}>Add Role</button>
@@ -184,12 +189,14 @@ interface PlayerViewProps {
 const PlayerView: React.FC<PlayerViewProps> = ({ roomCode, players }) => {
   return (
     <div>
-      <h3 style={{ marginBottom: '20px' }}>Waiting in Room: <span style={{ color: '#FFEB3B' }}>{roomCode}</span></h3>
+      <h3 style={{ marginBottom: '20px' }}>Waiting in Room: <span style={{ color: '#FFEB3B' }}>{roomCode.toUpperCase()}</span></h3>
       <p>Waiting for the Game Master to start the game...</p>
 
-      <h4>Players Joined ({players.length})</h4>
+      <h4>Players Joined ({players.length - 1})</h4>
       <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px' }}>
-        {players.map(p => <div key={p.id}>{p.nickname}</div>)}
+        {players.map(p => (
+            <PlayerListItem key={p.id} player={p} />
+        ))}
       </div>
     </div>
   );
@@ -201,19 +208,107 @@ export const Lobby: React.FC = () => {
   const [view, setView] = useState<ViewState>('initial');
   const [nickname, setNickname] = useState('');
   const [roomInput, setRoomInput] = useState('');
+
+  // Game State from Server
+  const [currentRoomCode, setCurrentRoomCode] = useState('');
+  const [isHost, setIsHost] = useState(false);
+  const [roomPlayers, setRoomPlayers] = useState<Player[]>([]);
+  const [roomRoles, setRoomRoles] = useState<Role[]>([]); // Roles state managed by GM
+  
+  // UI States
+  const [joinError, setJoinError] = useState<string | null>(null);
   
   // Dummy State for GM View
   const [currentRoles, setCurrentRoles] = useState<Role[]>(STARTER_ROLES);
   
   // In a real app, this would be determined by the backend
   const isGM = view === 'create'; 
-  // const currentRoomCode = 'ABCD'; // Mock Room Code
 
-  const handleJoinOrCreate = (action: 'create' | 'join') => {
-    if (nickname.trim()) {
-      setView(action);
-      // NOTE: Here is where you would call socket.emit('createRoom') or socket.emit('joinRoom')
+  // --- Socket Event Handlers (Dynamic Player List) ---
+  useEffect(() => {
+    // Listener for when *any* player joins/leaves/updates in the current room
+    const handlePlayerListUpdate = (players: Player[]) => {
+      setRoomPlayers(players);
+
+      const self = players.find(p => p.id === socket.id);
+
+      if (self) {
+        const newHostStatus = self.isHost;
+        setIsHost(newHostStatus); 
+        
+        if (newHostStatus) {
+          setView('create')
+        }
+      }
+    };
+
+    if (currentRoomCode) {
+        // Start listening only when we are in a room
+        socket.on('playerListUpdate', handlePlayerListUpdate);
     }
+
+    return () => {
+      socket.off('playerListUpdate', handlePlayerListUpdate);
+    };
+  }, [currentRoomCode, isHost]);
+
+  // --- Event Emitters ---
+  
+  const handleCreateRoom = () => {
+    setJoinError(null);
+    if (!nickname.trim()) return;
+
+    // Send the creation request and expect a callback response
+    socket.emit('createRoom', { nickname: nickname.trim() }, (response: { success: boolean, roomCode?: string }) => {
+      if (response.success && response.roomCode) {
+        // Success: Transition to the room
+        setCurrentRoomCode(response.roomCode);
+        setIsHost(true);
+        setView('create');//sets GM view
+      } else {
+        // Handle creation failure (unlikely but possible)
+        setJoinError("Failed to create room.");
+      }
+    });
+  };
+
+  const handleJoinRoom = () => {
+    setJoinError(null);
+    if (!nickname.trim() || roomInput.length !== 4) {
+      setJoinError("Please enter a nickname and a 4 character room code.");
+      return;
+    }
+
+    // Send the join request and expect a callback response with validation result
+    socket.emit('joinRoom', { roomCode: roomInput.toUpperCase(), nickname: nickname.trim() }, 
+        (response: { success: boolean, message?: string, room?: RoomState }) => {
+      if (response.success && response.room) {
+        // Success: Transition to the room
+        setCurrentRoomCode(roomInput.toUpperCase());
+        setIsHost(response.room.hostId === socket.id);
+        setRoomPlayers(response.room.players);
+        setRoomRoles(response.room.roles);
+        setView('join');//sets player view
+      } else {
+        // Failure: Display the error message from the server
+        setJoinError(response.message || "An unknown error occurred.");
+      }
+    });
+  };
+
+  const handleLeaveRoom = () => {
+    if (currentRoomCode) {
+        // 1. Tell the server we are leaving this specific room
+        socket.emit('leaveRoom', { roomCode: currentRoomCode });
+    }
+    
+    // 2. Reset local state to initial view
+    setCurrentRoomCode('');
+    setIsHost(false);
+    setRoomPlayers([]);
+    setRoomRoles([]);
+    setRoomInput('');
+    setView('initial');
   };
 
   return (
@@ -229,7 +324,7 @@ export const Lobby: React.FC = () => {
               value={nickname} 
               onChange={(e) => setNickname(e.target.value)}
             />
-            <Button className="create" onClick={() => handleJoinOrCreate('create')}>
+            <Button className="create" onClick={handleCreateRoom} disabled={!nickname.trim()}>
               Create Room (GM)
             </Button>
             <Input 
@@ -237,19 +332,25 @@ export const Lobby: React.FC = () => {
               value={roomInput} 
               onChange={(e) => setRoomInput(e.target.value)}
               maxLength={4}
-              style={{ marginTop: '20px' }}
+              style={{ marginTop: '20px', textTransform: 'uppercase' }}
             />
-            <Button className="join" onClick={() => handleJoinOrCreate('join')} disabled={!roomInput.trim()}>
+            <Button className="join" onClick={handleJoinRoom} disabled={!roomInput.trim() || !nickname.trim()}>
               Join Room
             </Button>
+            {/* --- Error Message Display --- */}
+            {joinError && (
+              <p style={{ color: '#f44336', marginTop: '10px', fontSize: '0.9rem' }}>
+                {joinError}
+              </p>
+            )}
           </>
         )}
 
         {/* --- GM View --- */}
         {view === 'create' && (
           <GMView 
-            roomCode={roomInput}
-            players={MOCK_PLAYERS}
+            roomCode={currentRoomCode}
+            players={roomPlayers}
             roles={currentRoles}
             setRoles={setCurrentRoles}
           />
@@ -259,17 +360,17 @@ export const Lobby: React.FC = () => {
         {view === 'join' && !isGM && (
           <PlayerView 
             roomCode={roomInput}
-            players={MOCK_PLAYERS}
+            players={roomPlayers}
           />
         )}
         
         {/* Back Button */}
         {view !== 'initial' && (
           <button 
-            onClick={() => setView('initial')} 
+            onClick={handleLeaveRoom} 
             style={{ marginTop: '20px', background: 'none', border: 'none', color: '#90CAF9', cursor: 'pointer' }}
           >
-            &larr; Back
+            &larr; Leave Room
           </button>
         )}
         

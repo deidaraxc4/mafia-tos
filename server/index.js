@@ -27,6 +27,50 @@ function generateRoomCode() {
     return code;
 }
 
+function handlePlayerCleanup(playerId) {
+    let roomCodeToUpdate = null;
+    let roomToUpdate = null;
+
+    // 1. Iterate through all active rooms to find the player
+    for (const [roomCode, room] of Object.entries(activeRooms)) {
+        const playerIndex = room.players.findIndex(p => p.id === playerId);
+
+        if (playerIndex !== -1) {
+            roomCodeToUpdate = roomCode;
+            roomToUpdate = room;
+
+            // 2. Remove the player from the room's players array
+            room.players.splice(playerIndex, 1);
+            console.log(`Removed disconnected player ${playerId} from room ${roomCode}.`);
+            
+            // 3. Check for Host Cleanup
+            if (room.hostId === playerId) {
+                // If the host disconnects, the room must be handled.
+                if (room.players.length > 0) {
+                    // Assign new host to the first remaining player
+                    room.hostId = room.players[0].id;
+                    room.players[0].isHost = true;
+                    console.log(`New host assigned to: ${room.players[0].nickname}`);
+                } else {
+                    // Room is now empty. Delete the room state.
+                    delete activeRooms[roomCode];
+                    console.log(`Room ${roomCode} is now empty and has been deleted.`);
+                    return; // Exit cleanup since the room is gone
+                }
+            }
+
+            // Since a player was found and removed, we can stop searching.
+            break; 
+        }
+    }
+
+    // 4. Notify remaining players in the room if a room was affected
+    if (roomCodeToUpdate && roomToUpdate) {
+        // Broadcast the new, updated player list to all sockets still in the room
+        io.to(roomCodeToUpdate).emit('playerListUpdate', roomToUpdate.players);
+    }
+}
+
 // --- Socket.io Event Handling ---
 
 io.on('connection', (socket) => {
@@ -60,7 +104,7 @@ io.on('connection', (socket) => {
     });
 
     // Handle incoming 'joinRoom' event from the frontend (the actual user intent), maybe delete
-    socket.on('joinRoom', (data) => {
+    socket.on('joinRoom', (data, callback) => {
         const { roomCode, nickname } = data;
         const room = activeRooms[roomCode];
         // 1. Validate roomcode if exists
@@ -89,12 +133,25 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('playerListUpdate', room.players);
     });
 
+    // --- Handle Manual Room Departure (e.g., Back button click) ---
+    socket.on('leaveRoom', (data) => {
+        const { roomCode } = data;
+        
+        // 1. Remove socket from the room channel
+        socket.leave(roomCode);
+        
+        // 2. Reuse the cleanup logic to update the room state
+        handlePlayerCleanup(socket.id); 
+        
+        console.log(`Player ${socket.id} manually left room ${roomCode}.`);
+    });
+
     // Handle user disconnection
     socket.on('disconnect', () => {
         connectedClients--;
         console.log(`User disconnected. Socket ID: ${socket.id}. Total connections: ${connectedClients}`);
         
-        // NOTE: In a real app, you would handle removing the player from their room state.
+        handlePlayerCleanup(socket.id); 
     });
 });
 
