@@ -71,6 +71,38 @@ function handlePlayerCleanup(playerId) {
     }
 }
 
+function assignRoles(room) {
+    const nonHostPlayers = room.players.filter(p => !p.isHost);
+    // 1. Create a copy of the roles array for random assignment
+    let availableRoles = [...room.roles]; 
+    console.log(`[debug] availableRoles length is ${availableRoles.length}`)
+    availableRoles.map(r => console.log(r));
+    
+    // 2. Shuffle the roles
+    for (let i = availableRoles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availableRoles[i], availableRoles[j]] = [availableRoles[j], availableRoles[i]];
+    }
+
+    // 3. Assign shuffled roles to players
+    nonHostPlayers.forEach((player, index) => {
+        player.role = availableRoles[index];
+        player.isAlive = true; // Initialize life status
+        player.target = null; // Initialize night action target
+    });
+
+    // 4. Ensure the Host has NO role assigned
+    const hostPlayer = room.players.find(p => p.isHost);
+    if (hostPlayer) {
+        hostPlayer.role = null; 
+        hostPlayer.isAlive = true; // GM is always alive for administration
+    }
+
+    // 5. Update room status
+    room.status = 'NIGHT'; // Game starts immediately at night 0
+    room.dayNumber = 0;
+}
+
 // --- Socket.io Event Handling ---
 
 io.on('connection', (socket) => {
@@ -100,7 +132,7 @@ io.on('connection', (socket) => {
 
         // 3. Send response back to the client using the callback
         // This is crucial for getting the new room code back to the GM client.
-        callback({ success: true, roomCode: roomCode });
+        callback({ success: true, roomCode: roomCode, room: activeRooms[roomCode] });
     });
 
     // Handle incoming 'joinRoom' event from the frontend (the actual user intent), maybe delete
@@ -144,6 +176,55 @@ io.on('connection', (socket) => {
         handlePlayerCleanup(socket.id); 
         
         console.log(`Player ${socket.id} manually left room ${roomCode}.`);
+    });
+
+    // --- Handle Game Start Event ---
+    socket.on('startGame', (data) => {
+        const { roomCode, finalRoles } = data;
+        const room = activeRooms[roomCode];
+
+        // 1. Validation (Security Check)
+        if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') {
+            return socket.emit('gameError', 'Cannot start game. Not host, or room not in lobby.');
+        }
+
+        // 2. Finalize Roles and Assign
+        room.roles = finalRoles; // GM's final list of roles
+        assignRoles(room);       // Shuffle and assign roles to players
+
+        console.log(`Game started in room ${roomCode}. Roles assigned.`);
+        //debug
+        room.players.map(p => {
+            console.log(`player ${p.nickname} has role ${p.role} and hoststatus is ${p.isHost}`)
+        })
+
+        // 3. Notify Clients of New Phase ('NIGHT') and Distribute Roles
+
+        // A. Private Role Assignment (for every player)
+        room.players.forEach(player => {
+            // Emit to ONLY the specific player's socket ID
+            io.to(player.id).emit('roleAssigned', { 
+                role: player.role,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    nickname: p.nickname,
+                    isHost: p.isHost,
+                    isAlive: p.isAlive,
+                    // GM gets full list. Others only get their own role.
+                    // This is handled in the next step (B) by only sending the GM the full list.
+                }))
+            });
+        });
+        
+        // B. Broadcast Phase/Lobby Update (for all players)
+        // This tells everyone the game has moved out of the LOBBY phase.
+        // It also sends the GM the full player list *with* roles.
+        io.to(roomCode).emit('gamePhaseChange', { 
+            status: room.status, // 'NIGHT'
+            dayNumber: room.dayNumber, // 0
+            // Send the entire player list (with roles) only to the host
+            allPlayersWithRoles: room.players 
+        });
     });
 
     // Handle user disconnection

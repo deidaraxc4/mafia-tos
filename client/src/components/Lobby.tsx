@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { socket } from '../socket';
 import { PlayerListItem } from './PlayerListItem';
+import { GamePhaseScreen } from './GamePhaseScreen';
 
 const LobbyContainer = styled.div`
   display: flex;
@@ -77,11 +78,13 @@ type ViewState = 'initial' | 'create' | 'join';
 type Role = 'Mayor' | 'Escort' | 'Transporter' | 'Medium' | 'Retributionist' | 'Lookout' | 'Sheriff' | 'Veteran' | 'Vigilante' | 'Bodyguard' | 'Doctor' | 'Consigliere'
 | 'Consort' | 'Framer' | 'Blackmailer' | 'Godfather' | 'Mafioso' | 'Executioner' | 'Jester' | 'Survivor' | 'Amnesiac' | 'Serial Killer' | 'Werewolf';
 
-interface Player {
+export interface Player {
   id: string;
   nickname: string;
-  role: Role;
+  role: Role | null;
   isHost: boolean;
+  target?: string | null;
+  isAlive: boolean;
 }
 
 interface RoomState {
@@ -102,15 +105,19 @@ interface GMViewProps {
   players: Player[];
   roles: Role[];
   setRoles: React.Dispatch<React.SetStateAction<Role[]>>;
+  gamePhase: 'LOBBY' | 'NIGHT' | 'DAY' | 'GAME_OVER';
+  allPlayersWithRoles: Player[];
+  handleStartGame: () => void;
+  myNickname: string;
 }
 
-const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) => {
+const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gamePhase, allPlayersWithRoles, handleStartGame, myNickname }) => {
   const [newRole, setNewRole] = useState<Role>('Town');
   
   // Validation: Check if player count matches role count
   const playerCount = players.length - 1; // we don't count GM as player
   const roleCount = roles.length;
-  const canStartGame = playerCount === roleCount && playerCount >= 7; // Min players check
+  const canStartGame = playerCount === roleCount && playerCount >= 2; // Min players check
 
   const handleAddRole = () => {
     setRoles(prev => [...prev, newRole]);
@@ -122,7 +129,7 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
   
   // Visual Feedback based on validation
   const validationText = 
-    playerCount < 8 
+    playerCount < 2 
       ? 'Need at least 7 players to start.' 
       : (playerCount !== roleCount 
         ? `Player Count (${playerCount}) ≠ Role Count (${roleCount})` 
@@ -136,8 +143,18 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
       
       <h4>Players ({playerCount})</h4>
       <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
-        {players.map(p => (
+        {/* {players.map(p => (
             <PlayerListItem key={p.id} player={p} />
+        ))} */}
+        {(gamePhase !== 'LOBBY' ? allPlayersWithRoles : players).map(p => (
+          <div key={p.id}>
+              <PlayerListItem player={p} />
+              {gamePhase !== 'LOBBY' && (
+                  <span style={{ color: '#90CAF9', fontSize: '0.9em', marginLeft: '5px' }}>
+                      ({p.role}) {/* <-- Display Role for GM */}
+                  </span>
+              )}
+          </div>
         ))}
       </div>
 
@@ -169,12 +186,18 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
       
       {/* Start Game Validation and Button */}
       <p style={{ color: validationColor, fontWeight: 'bold' }}>{validationText}</p>
-      <Button 
-        style={{ backgroundColor: canStartGame ? '#4CAF50' : '#757575' }} 
-        disabled={!canStartGame}
-      >
-        Start Game
-      </Button>
+      {gamePhase === 'LOBBY' && (
+          <Button 
+              onClick={handleStartGame} // <-- Call the new handler
+              style={{ backgroundColor: canStartGame ? '#4CAF50' : '#757575' }} 
+              disabled={!canStartGame}
+          >
+              Start Game
+          </Button>
+      )}
+      
+      {/* Display the Game Screen if gamePhase is not LOBBY */}
+      {gamePhase !== 'LOBBY' && <GamePhaseScreen role={'GM'} allPlayers={allPlayersWithRoles} phase={gamePhase} myNickname={myNickname} />}
     </div>
   );
 };
@@ -184,9 +207,27 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles }) =
 interface PlayerViewProps {
   roomCode: string;
   players: Player[];
+  gamePhase: 'LOBBY' | 'NIGHT' | 'DAY' | 'GAME_OVER';
+  myRole: Role | null;
+  allPlayersWithRoles: Player[];
+  myNickname: string;
 }
 
-const PlayerView: React.FC<PlayerViewProps> = ({ roomCode, players }) => {
+const PlayerView: React.FC<PlayerViewProps> = ({ roomCode, players, gamePhase, myRole, allPlayersWithRoles, myNickname }) => {
+  // Check if the game has started
+  const gameHasStarted = gamePhase !== 'LOBBY';
+
+  if (gameHasStarted) {
+      return (
+          <GamePhaseScreen 
+              role={myRole} 
+              phase={gamePhase} 
+              allPlayers={allPlayersWithRoles} 
+              myNickname={myNickname}
+          />
+      );
+  }
+
   return (
     <div>
       <h3 style={{ marginBottom: '20px' }}>Waiting in Room: <span style={{ color: '#FFEB3B' }}>{roomCode.toUpperCase()}</span></h3>
@@ -213,12 +254,16 @@ export const Lobby: React.FC = () => {
   const [currentRoomCode, setCurrentRoomCode] = useState('');
   const [isHost, setIsHost] = useState(false);
   const [roomPlayers, setRoomPlayers] = useState<Player[]>([]);
-  const [roomRoles, setRoomRoles] = useState<Role[]>([]); // Roles state managed by GM
+  // const [roomRoles, setRoomRoles] = useState<Role[]>([]); // Roles state managed by GM
+
+  const [gamePhase, setGamePhase] = useState<'LOBBY' | 'NIGHT' | 'DAY' | 'GAME_OVER'>('LOBBY');
+  const [myRole, setMyRole] = useState<Role | null>(null);
+  const [allPlayersWithRoles, setAllPlayersWithRoles] = useState<Player[]>([]); // For GM only
   
   // UI States
   const [joinError, setJoinError] = useState<string | null>(null);
   
-  // Dummy State for GM View
+  // List of roles selected for GM View
   const [currentRoles, setCurrentRoles] = useState<Role[]>(STARTER_ROLES);
   
   // In a real app, this would be determined by the backend
@@ -252,19 +297,46 @@ export const Lobby: React.FC = () => {
     };
   }, [currentRoomCode, isHost]);
 
+  // --- Listener for Private Role Assignment ---
+  useEffect(() => {
+      socket.on('roleAssigned', (data: { role: string, players: Player[] }) => {
+          console.log(`you were assigned role ${data.role}`)
+          setMyRole(data.role); // Set the player's own role securely
+      });
+
+      // Listener for Phase Change (used by GM and Players)
+      socket.on('gamePhaseChange', (data: { status: 'NIGHT' | 'DAY' | 'GAME_OVER', dayNumber: number, allPlayersWithRoles?: Player[] }) => {
+          setGamePhase(data.status);
+          
+          if (data.allPlayersWithRoles) {
+              setAllPlayersWithRoles(data.allPlayersWithRoles);
+          }
+      });
+
+      return () => {
+          socket.off('roleAssigned');
+          socket.off('gamePhaseChange');
+      };
+  }, []);
+
   // --- Event Emitters ---
+
+  const handleStartGame = () => {
+    socket.emit('startGame', { roomCode: currentRoomCode, finalRoles: currentRoles });
+  };
   
   const handleCreateRoom = () => {
     setJoinError(null);
     if (!nickname.trim()) return;
 
     // Send the creation request and expect a callback response
-    socket.emit('createRoom', { nickname: nickname.trim() }, (response: { success: boolean, roomCode?: string }) => {
+    socket.emit('createRoom', { nickname: nickname.trim() }, (response: { success: boolean, roomCode?: string, room: RoomState }) => {
       if (response.success && response.roomCode) {
         // Success: Transition to the room
         setCurrentRoomCode(response.roomCode);
         setIsHost(true);
         setView('create');//sets GM view
+        setRoomPlayers(response.room.players)
       } else {
         // Handle creation failure (unlikely but possible)
         setJoinError("Failed to create room.");
@@ -287,7 +359,6 @@ export const Lobby: React.FC = () => {
         setCurrentRoomCode(roomInput.toUpperCase());
         setIsHost(response.room.hostId === socket.id);
         setRoomPlayers(response.room.players);
-        setRoomRoles(response.room.roles);
         setView('join');//sets player view
       } else {
         // Failure: Display the error message from the server
@@ -306,7 +377,6 @@ export const Lobby: React.FC = () => {
     setCurrentRoomCode('');
     setIsHost(false);
     setRoomPlayers([]);
-    setRoomRoles([]);
     setRoomInput('');
     setView('initial');
   };
@@ -353,6 +423,10 @@ export const Lobby: React.FC = () => {
             players={roomPlayers}
             roles={currentRoles}
             setRoles={setCurrentRoles}
+            gamePhase={gamePhase}
+            allPlayersWithRoles={allPlayersWithRoles}
+            handleStartGame={handleStartGame}
+            myNickname={nickname}
           />
         )}
         
@@ -361,6 +435,10 @@ export const Lobby: React.FC = () => {
           <PlayerView 
             roomCode={roomInput}
             players={roomPlayers}
+            gamePhase={gamePhase}
+            myRole={myRole}
+            allPlayersWithRoles={allPlayersWithRoles}
+            myNickname={nickname}
           />
         )}
         
