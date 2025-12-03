@@ -18,6 +18,29 @@ let connectedClients = 0;
 
 const activeRooms = {};
 
+const NIGHT_WAKEUP_ORDER = [
+    'Transporter',
+    'Escort',
+    'Consort',
+    'Consig',
+    'Framer',
+    'Blackmailer',
+    'Medium',
+    'Retributionist',
+    'Doctor',
+    'Bodyguard',
+    'Mafioso',
+    'Godfather',
+    'Vigilante',
+    'Veteran',
+    'Serial Killer',
+    'Werewolf',
+    'Sheriff',
+    'Lookout',
+    'Survivor',
+    'Amnesiac'
+];
+
 function generateRoomCode() {
     let code;
     do {
@@ -99,8 +122,30 @@ function assignRoles(room) {
     }
 
     // 5. Update room status
-    room.status = 'NIGHT'; // Game starts immediately at night 0
-    room.dayNumber = 0;
+    room.status = 'DAY'; // Game starts immediately at night 0
+    room.dayNumber = 1;
+    room.currentNightRoleIndex = 0;
+}
+
+function getCurrentNightRole(room) {
+    const index = room.currentNightRoleIndex;
+    const cycleList = room.nightCycleRoles;
+    console.log(`[debug] cyclelist=${cycleList}`)
+
+    if (index >= 0 && index < cycleList.length) {
+        const roleName = cycleList[index];
+        
+        // Find all living players with this role to see if they need to wake up
+        const activePlayers = room.players.filter(p => 
+            p.isAlive && p.role === roleName
+        );
+        
+        return {
+            role: roleName,
+            wakeUp: activePlayers.length > 0 // Only wake up if at least one living player has this role
+        };
+    }
+    return null; // Night phase is complete
 }
 
 // --- Socket.io Event Handling ---
@@ -108,6 +153,19 @@ function assignRoles(room) {
 io.on('connection', (socket) => {
     connectedClients++;
     console.log(`User connected. Socket ID: ${socket.id}. Total connections: ${connectedClients}`);
+
+    const sendGMUpdate = (roomCode) => {
+        const room = activeRooms[roomCode];
+        if (!room) return;
+        
+        const currentRoleData = getCurrentNightRole(room);
+        
+        // Broadcast to the GM only (using their hostId)
+        io.to(room.hostId).emit('updateGMControl', {
+            currentRole: currentRoleData,
+            nightActions: room.nightActions
+        });
+    }
     
     // Socket Events
 
@@ -123,6 +181,9 @@ io.on('connection', (socket) => {
             roles: [], // GM will configure this later
             players: [{ id: socket.id, nickname: nickname, isHost: true, role: null }],
             // Add initial vote/night action tracking if needed
+            currentNightRoleIndex: 0,
+            nightActions: [],
+            nightCycleRoles: [],
         };
 
         // 2. Add GM to the room's socket channel
@@ -220,11 +281,81 @@ io.on('connection', (socket) => {
         // This tells everyone the game has moved out of the LOBBY phase.
         // It also sends the GM the full player list *with* roles.
         io.to(roomCode).emit('gamePhaseChange', { 
-            status: room.status, // 'NIGHT'
-            dayNumber: room.dayNumber, // 0
+            status: room.status, // 'DAY'
+            dayNumber: room.dayNumber, // 1
             // Send the entire player list (with roles) only to the host
             allPlayersWithRoles: room.players 
         });
+    });
+
+    // --- GM Control: Transition from DAY to NIGHT ---
+    socket.on('gmStartNight', (data) => {
+        const { roomCode } = data;
+        const room = activeRooms[roomCode];
+
+        if (!room || room.hostId !== socket.id || room.status !== 'DAY') return;
+
+        // --- 1. BUILD THE DYNAMIC NIGHT CYCLE LIST ---
+        const uniqueGameRoles = Array.from(new Set(room.roles));
+        console.log(`[debug] uniqueGameRoles= ${uniqueGameRoles}`)
+        
+        // Filter the static priority list to include only roles present in the game
+        room.nightCycleRoles = NIGHT_WAKEUP_ORDER.filter(priorityRole => 
+            uniqueGameRoles.includes(priorityRole)
+        );
+
+        // 2. Transition to Night
+        room.status = 'NIGHT';
+        room.currentNightRoleIndex = 0; // Reset role index for the start of the night
+        
+        // 3. Clear any previous night actions (optional, but good practice)
+        room.nightActions = [];
+
+        // 4. Notify all clients of the phase change
+        io.to(roomCode).emit('gamePhaseChange', { 
+            status: room.status, // 'NIGHT'
+            dayNumber: room.dayNumber, 
+            allPlayersWithRoles: room.players 
+        });
+        
+        // 5. Send initial control state to GM
+        sendGMUpdate(roomCode);
+    });
+
+    // --- GM Control: Cycle to Next Role (Night Only) ---
+    socket.on('gmNextRole', (data) => { // Renamed event for clarity
+        const { roomCode, targetPlayerId } = data;
+        const room = activeRooms[roomCode];
+
+        // Ensure we are in NIGHT phase
+        if (!room || room.hostId !== socket.id || room.status !== 'NIGHT') return;
+
+        // 1. LOG previous action (if any target was selected)
+        if (targetPlayerId) {
+            const previousRoleData = getCurrentNightRole(room); 
+            if (previousRoleData) {
+                const targetedPlayer = room.players.find(p => p.id === targetPlayerId);
+                const playerWithRole = room.players.find(p => p.role === previousRoleData.role && p.isAlive);
+                
+                const actionText = `${playerWithRole ? playerWithRole.nickname : previousRoleData.role} (${previousRoleData.role}) targeted ${targetedPlayer ? targetedPlayer.nickname : 'No Player'}.`;
+                
+                room.nightActions.push(actionText);
+            }
+        }
+        
+        // 2. Advance Role Index
+        room.currentNightRoleIndex++;
+
+        // 3. Send updated state back to the GM
+        sendGMUpdate(roomCode);
+    });
+
+    // --- Initial State Request ---
+    socket.on('requestGMControlState', (data) => {
+        const room = activeRooms[data.roomCode];
+        if (room && room.hostId === socket.id) {
+            sendGMUpdate(data.roomCode);
+        }
     });
 
     // Handle user disconnection

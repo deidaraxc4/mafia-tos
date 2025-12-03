@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { socket } from '../socket';
 import { PlayerListItem } from './PlayerListItem';
 import { GamePhaseScreen } from './GamePhaseScreen';
+import { GMGameScreen } from './GMGameScreen';
 
 const LobbyContainer = styled.div`
   display: flex;
@@ -112,7 +113,7 @@ interface GMViewProps {
 }
 
 const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gamePhase, allPlayersWithRoles, handleStartGame, myNickname }) => {
-  const [newRole, setNewRole] = useState<Role>('Town');
+  const [newRole, setNewRole] = useState<Role>('Mayor');
   
   // Validation: Check if player count matches role count
   const playerCount = players.length - 1; // we don't count GM as player
@@ -136,68 +137,82 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gam
         : 'Ready to Start!');
         
   const validationColor = canStartGame ? '#4CAF50' : '#FF9800';
+  const inLobby = gamePhase === 'LOBBY';
+  console.log(gamePhase)
 
   return (
     <div>
-      <h3 style={{ marginBottom: '10px' }}>Room Code: <span style={{ color: '#FFEB3B' }}>{roomCode}</span></h3>
-      
-      <h4>Players ({playerCount})</h4>
-      <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
-        {/* {players.map(p => (
-            <PlayerListItem key={p.id} player={p} />
-        ))} */}
-        {(gamePhase !== 'LOBBY' ? allPlayersWithRoles : players).map(p => (
-          <div key={p.id}>
-              <PlayerListItem player={p} />
-              {gamePhase !== 'LOBBY' && (
-                  <span style={{ color: '#90CAF9', fontSize: '0.9em', marginLeft: '5px' }}>
-                      ({p.role}) {/* <-- Display Role for GM */}
-                  </span>
-              )}
+      {inLobby && (
+        <>
+          <h3 style={{ marginBottom: '10px' }}>Room Code: <span style={{ color: '#FFEB3B' }}>{roomCode}</span></h3>
+          
+          <h4>Players ({playerCount})</h4>
+          <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
+            {/* {players.map(p => (
+                <PlayerListItem key={p.id} player={p} />
+            ))} */}
+            {(gamePhase !== 'LOBBY' ? allPlayersWithRoles : players).map(p => (
+              <div key={p.id}>
+                  <PlayerListItem player={p} />
+                  {gamePhase !== 'LOBBY' && (
+                      <span style={{ color: '#90CAF9', fontSize: '0.9em', marginLeft: '5px' }}>
+                          ({p.role}) {/* <-- Display Role for GM */}
+                      </span>
+                  )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <h4>Role List ({roleCount})</h4>
-      <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
-        {roles.map((role, index) => (
-          <div key={index} style={{ display: 'flex', justifyContent: 'space-between' }}>
-            {role}
-            <button onClick={() => handleRemoveRole(index)} style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer' }}>
-              &times;
-            </button>
+          <h4>Role List ({roleCount})</h4>
+          <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #5a5a7d', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
+            {roles.map((role, index) => (
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                {role}
+                <button onClick={() => handleRemoveRole(index)} style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer' }}>
+                  &times;
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Role Configuration Dropdown */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <select 
-          value={newRole} 
-          onChange={(e) => setNewRole(e.target.value as Role)}
-          style={{ padding: '10px', flexGrow: 1, backgroundColor: '#1a1a2e', color: 'white' }}
-        >
-          {roleOptions.map((r, index) => {
-            return(<option key={r} value={r}>{r}</option>)
-          })}
-        </select>
-        <button onClick={handleAddRole} style={{ padding: '10px', background: '#9C27B0' }}>Add Role</button>
-      </div>
-      
-      {/* Start Game Validation and Button */}
-      <p style={{ color: validationColor, fontWeight: 'bold' }}>{validationText}</p>
-      {gamePhase === 'LOBBY' && (
-          <Button 
-              onClick={handleStartGame} // <-- Call the new handler
-              style={{ backgroundColor: canStartGame ? '#4CAF50' : '#757575' }} 
-              disabled={!canStartGame}
-          >
-              Start Game
-          </Button>
+          {/* Role Configuration Dropdown */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <select 
+              value={newRole} 
+              onChange={(e) => setNewRole(e.target.value as Role)}
+              style={{ padding: '10px', flexGrow: 1, backgroundColor: '#1a1a2e', color: 'white' }}
+            >
+              {roleOptions.map((r, index) => {
+                return(<option key={r} value={r}>{r}</option>)
+              })}
+            </select>
+            <button onClick={handleAddRole} style={{ padding: '10px', background: '#9C27B0' }}>Add Role</button>
+          </div>
+          
+          {/* Start Game Validation and Button */}
+          <p style={{ color: validationColor, fontWeight: 'bold' }}>{validationText}</p>
+          {gamePhase === 'LOBBY' && (
+              <Button 
+                  onClick={handleStartGame} // <-- Call the new handler
+                  style={{ backgroundColor: canStartGame ? '#4CAF50' : '#757575' }} 
+                  disabled={!canStartGame}
+              >
+                  Start Game
+              </Button>
+          )}
+        </>
+      )}
+
+      {!inLobby && (
+          <GMGameScreen 
+              roomCode={roomCode}
+              allPlayers={allPlayersWithRoles}
+              gamePhase={gamePhase}
+          />
       )}
       
       {/* Display the Game Screen if gamePhase is not LOBBY */}
-      {gamePhase !== 'LOBBY' && <GamePhaseScreen role={'GM'} allPlayers={allPlayersWithRoles} phase={gamePhase} myNickname={myNickname} />}
+      {/* {gamePhase !== 'LOBBY' && <GamePhaseScreen role={'GM'} allPlayers={allPlayersWithRoles} phase={gamePhase} myNickname={myNickname} />} */}
     </div>
   );
 };

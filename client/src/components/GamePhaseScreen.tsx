@@ -18,7 +18,7 @@ const PhaseContainer = styled.div`
 
 export const GamePhaseScreen: React.FC<GamePhaseScreenProps> = ({ role, phase, allPlayers, myNickname }) => {
     // Only show alive players for targeting/voting
-    const alivePlayers = allPlayers.filter(p => p.isAlive);
+    const alivePlayers = allPlayers.filter(p => p.isAlive && !p.isHost);
 
     return (
         <PhaseContainer>
