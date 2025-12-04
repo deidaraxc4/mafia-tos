@@ -95,6 +95,22 @@ interface RoomState {
   players: Player[];
 }
 
+interface RoleInfo {
+  alignment: string;
+  description: string;
+  goal: string;
+}
+
+export type RoleConfig = {
+    [key: string]: RoleInfo;
+};
+
+interface RoleAssignedData {
+    role: Role | null;
+    players: Player[];
+    roleConfig: RoleConfig;
+}
+
 const STARTER_ROLES: Role[] = ['Mayor', 'Veteran', 'Doctor', 'Lookout', 'Sheriff', 'Godfather', 'Mafioso', 'Jester', 'Survivor'];
 const roleOptions = ['Mayor', 'Escort', 'Transporter', 'Medium', 'Retributionist', 'Lookout', 'Sheriff', 'Veteran', 'Vigilante', 'Bodyguard', 'Doctor', 'Consigliere',
 'Consort', 'Framer', 'Blackmailer', 'Godfather', 'Mafioso', 'Executioner', 'Jester', 'Survivor', 'Amnesiac', 'Serial Killer', 'Werewolf'];
@@ -225,9 +241,10 @@ interface PlayerViewProps {
   myRole: Role | null;
   allPlayersWithRoles: Player[];
   myNickname: string;
+  roleConfig: RoleConfig
 }
 
-const PlayerView: React.FC<PlayerViewProps> = ({ roomCode, players, gamePhase, myRole, allPlayersWithRoles, myNickname }) => {
+const PlayerView: React.FC<PlayerViewProps> = ({ roomCode, players, gamePhase, myRole, allPlayersWithRoles, myNickname, roleConfig }) => {
   // Check if the game has started
   const gameHasStarted = gamePhase !== 'LOBBY';
 
@@ -238,6 +255,7 @@ const PlayerView: React.FC<PlayerViewProps> = ({ roomCode, players, gamePhase, m
               phase={gamePhase} 
               allPlayers={allPlayersWithRoles} 
               myNickname={myNickname}
+              roleConfig={roleConfig}
           />
       );
   }
@@ -273,6 +291,7 @@ export const Lobby: React.FC = () => {
   const [gamePhase, setGamePhase] = useState<'LOBBY' | 'NIGHT' | 'DAY' | 'GAME_OVER'>('LOBBY');
   const [myRole, setMyRole] = useState<Role | null>(null);
   const [allPlayersWithRoles, setAllPlayersWithRoles] = useState<Player[]>([]); // For GM only
+  const [roleConfig, setRoleConfig] = useState<RoleConfig>({});
   
   // UI States
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -313,8 +332,13 @@ export const Lobby: React.FC = () => {
 
   // --- Listener for Private Role Assignment ---
   useEffect(() => {
-      socket.on('roleAssigned', (data: { role: string, players: Player[] }) => {
-          setMyRole(data.role); // Set the player's own role securely
+      // socket.on('roleAssigned', (data: { role: string, players: Player[] }) => {
+      //     setMyRole(data.role); // Set the player's own role securely
+      // });
+
+      socket.on('roleAssigned', (data: RoleAssignedData) => {
+        setMyRole(data.role); // Set the player's own role securely
+        setRoleConfig(data.roleConfig);
       });
 
       // Listener for Phase Change (used by GM and Players)
@@ -452,6 +476,7 @@ export const Lobby: React.FC = () => {
             myRole={myRole}
             allPlayersWithRoles={allPlayersWithRoles}
             myNickname={nickname}
+            roleConfig={roleConfig}
           />
         )}
         

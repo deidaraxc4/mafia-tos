@@ -41,6 +41,17 @@ const NIGHT_WAKEUP_ORDER = [
     'Amnesiac'
 ];
 
+const ROLE_CONFIG = {
+    "Doctor": {
+        "alignment": "Town (Protective)",
+        "description": "Each night choose 1 player to heal. If they are attacked, they survive. You cannot heal yourself on consecutive nights."
+    },
+    "Mafioso": {
+        "alignment": "Mafia (Killing)",
+        "description": "Carry out the Godfather's orders, you may target a player each night to kill."
+    }
+}
+
 function generateRoomCode() {
     let code;
     do {
@@ -271,7 +282,8 @@ io.on('connection', (socket) => {
                     isAlive: p.isAlive,
                     // GM gets full list. Others only get their own role.
                     // This is handled in the next step (B) by only sending the GM the full list.
-                }))
+                })),
+                roleConfig: ROLE_CONFIG
             });
         });
         

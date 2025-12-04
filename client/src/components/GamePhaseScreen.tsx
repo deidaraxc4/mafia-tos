@@ -1,12 +1,13 @@
 import React from 'react';
 import styled from 'styled-components';
-import type { Player } from './Lobby';
+import type { Player, RoleConfig } from './Lobby';
 
 interface GamePhaseScreenProps {
     role: string | null;
     phase: 'NIGHT' | 'DAY' | 'GAME_OVER';
     allPlayers: Player[]; // Full list of players (name/status)
     myNickname: string;
+    roleConfig: RoleConfig;
 }
 
 const PhaseContainer = styled.div`
@@ -16,9 +17,11 @@ const PhaseContainer = styled.div`
     border-radius: 10px;
 `;
 
-export const GamePhaseScreen: React.FC<GamePhaseScreenProps> = ({ role, phase, allPlayers, myNickname }) => {
+export const GamePhaseScreen: React.FC<GamePhaseScreenProps> = ({ role, phase, allPlayers, myNickname, roleConfig }) => {
     // Only show alive players for targeting/voting
     const alivePlayers = allPlayers.filter(p => p.isAlive && !p.isHost);
+    const roleKey = role || "Game Master";
+    const info = roleConfig[roleKey];
 
     return (
         <PhaseContainer>
@@ -27,8 +30,21 @@ export const GamePhaseScreen: React.FC<GamePhaseScreenProps> = ({ role, phase, a
             </h3>
             <h2>{phase === 'NIGHT' ? '🌑 Night Phase' : '☀️ Day Phase'}</h2>
             
-            <h3 style={{ color: '#FFEB3B' }}>Your Role: {role}</h3>
-            {/* TODO put faction allegiance and role description */}
+            {/* <h3 style={{ color: '#FFEB3B' }}>Your Role: {role}</h3> */}
+            {info && (
+                <div style={{ padding: '10px', backgroundColor: '#3c3c5c', borderRadius: '5px', marginTop: '15px' }}>
+                    <h4 style={{ color: '#FFEB3B', margin: '0 0 5px 0' }}>Your Role: {roleKey}</h4>
+                    <p style={{ color: '#90CAF9', margin: '0 0 5px 0', fontWeight: 'bold' }}>
+                        Alignment: {info.alignment}
+                    </p>
+                    <p style={{ color: '#6bd7c9ff', margin: '0' }}>
+                        Abilities: {info.description}
+                    </p>
+                    <p style={{ color: '#E0E0E0', margin: '0' }}>
+                        Goal: {info.goal}
+                    </p>
+                </div>
+            )}
             
             {phase === 'NIGHT' && (
                 <p>
