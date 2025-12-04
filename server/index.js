@@ -98,7 +98,6 @@ function assignRoles(room) {
     const nonHostPlayers = room.players.filter(p => !p.isHost);
     // 1. Create a copy of the roles array for random assignment
     let availableRoles = [...room.roles]; 
-    console.log(`[debug] availableRoles length is ${availableRoles.length}`)
     availableRoles.map(r => console.log(r));
     
     // 2. Shuffle the roles
@@ -130,7 +129,6 @@ function assignRoles(room) {
 function getCurrentNightRole(room) {
     const index = room.currentNightRoleIndex;
     const cycleList = room.nightCycleRoles;
-    console.log(`[debug] cyclelist=${cycleList}`)
 
     if (index >= 0 && index < cycleList.length) {
         const roleName = cycleList[index];
@@ -297,7 +295,6 @@ io.on('connection', (socket) => {
 
         // --- 1. BUILD THE DYNAMIC NIGHT CYCLE LIST ---
         const uniqueGameRoles = Array.from(new Set(room.roles));
-        console.log(`[debug] uniqueGameRoles= ${uniqueGameRoles}`)
         
         // Filter the static priority list to include only roles present in the game
         room.nightCycleRoles = NIGHT_WAKEUP_ORDER.filter(priorityRole => 
@@ -323,21 +320,25 @@ io.on('connection', (socket) => {
     });
 
     // --- GM Control: Cycle to Next Role (Night Only) ---
-    socket.on('gmNextRole', (data) => { // Renamed event for clarity
-        const { roomCode, targetPlayerId } = data;
+    socket.on('gmNextRole', (data) => {
+        const { roomCode, targetPlayerIds } = data;
         const room = activeRooms[roomCode];
 
-        // Ensure we are in NIGHT phase
         if (!room || room.hostId !== socket.id || room.status !== 'NIGHT') return;
 
         // 1. LOG previous action (if any target was selected)
-        if (targetPlayerId) {
+        if (targetPlayerIds && targetPlayerIds.length > 0) { // Check for array length > 0
             const previousRoleData = getCurrentNightRole(room); 
             if (previousRoleData) {
-                const targetedPlayer = room.players.find(p => p.id === targetPlayerId);
                 const playerWithRole = room.players.find(p => p.role === previousRoleData.role && p.isAlive);
                 
-                const actionText = `${playerWithRole ? playerWithRole.nickname : previousRoleData.role} (${previousRoleData.role}) targeted ${targetedPlayer ? targetedPlayer.nickname : 'No Player'}.`;
+                // --- CONSTRUCT THE TARGET STRING ---
+                const targetNames = targetPlayerIds.map(targetId => {
+                    const player = room.players.find(p => p.id === targetId);
+                    return player ? player.nickname : 'Unknown Player';
+                }).join(', '); // Join multiple targets with a comma and space
+                
+                const actionText = `${playerWithRole ? playerWithRole.nickname : previousRoleData.role} (${previousRoleData.role}) targeted ${targetNames}.`;
                 
                 room.nightActions.push(actionText);
             }
@@ -347,6 +348,59 @@ io.on('connection', (socket) => {
         room.currentNightRoleIndex++;
 
         // 3. Send updated state back to the GM
+        sendGMUpdate(roomCode);
+    });
+
+    // --- GM Control: Process Phase Actions (End Night/Begin Day) ---
+    socket.on('processGamePhase', (data) => {
+        // Now expecting 'playersKilled' array from the GM
+        const { roomCode, phase, playersKilled } = data; 
+        const room = activeRooms[roomCode];
+
+        if (!room || room.hostId !== socket.id || room.status !== 'NIGHT') return;
+
+        console.log(`Processing night actions and ${playersKilled.length} death(s) for room ${roomCode}...`);
+
+        // --- 1. PROCESS MANUAL DEATHS ---
+        let killedNames = [];
+        
+        if (Array.isArray(playersKilled) && playersKilled.length > 0) {
+            room.players.forEach(player => {
+                // If the player's ID is in the list sent by the GM
+                if (playersKilled.includes(player.id)) {
+                    player.isAlive = false; // Player is dead
+                    killedNames.push(player.nickname);
+                }
+            });
+        }
+        
+        // --- 2. GENERATE NIGHT REPORT ---
+        let nightReport;
+        if (killedNames.length > 0) {
+            nightReport = `The town awakes to find that **${killedNames.join(' and ')}** ${killedNames.length === 1 ? 'was' : 'were'} killed overnight.`;
+        } else {
+            nightReport = "The town awakes. Fortunately, no one was killed overnight.";
+        }
+        
+        // --- 3. TRANSITION STATE TO DAY ---
+        if (phase === 'DAY') {
+            room.status = 'DAY';
+            room.dayNumber++; 
+            
+            // Clear night-specific tracking
+            room.currentNightRoleIndex = 0;
+            room.nightCycleRoles = []; 
+        }
+        
+        // --- 4. NOTIFY ALL CLIENTS OF NEW PHASE ---
+        io.to(roomCode).emit('gamePhaseChange', { 
+            status: room.status, // 'DAY'
+            dayNumber: room.dayNumber, 
+            nightReport: nightReport, // New info for players
+            allPlayersWithRoles: room.players // Send updated player status
+        });
+
+        // 5. Send final GM update for Day phase
         sendGMUpdate(roomCode);
     });
 

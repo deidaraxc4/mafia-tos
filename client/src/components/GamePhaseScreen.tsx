@@ -46,12 +46,16 @@ export const GamePhaseScreen: React.FC<GamePhaseScreenProps> = ({ role, phase, a
             <h4>Living Players ({alivePlayers.length})</h4>
             {/* Display list of players who are still alive */}
             <ul style={{ listStyleType: 'none', padding: 0 }}>
-                {alivePlayers.map(p => (
-                    <li key={p.id} style={{ opacity: p.isAlive ? 1 : 0.5 }}>
-                        {p.nickname}
-                        {!p.isAlive && " (Deceased)"}
-                    </li>
-                ))}
+                {allPlayers.map(p => {
+                    if (!p.isHost) {
+                        return(
+                            <li key={p.id} style={{ opacity: p.isAlive ? 1 : 0.5, textDecoration: p.isAlive ? 'none' : 'line-through' }}>
+                                {p.nickname}
+                                {!p.isAlive && " (Deceased)"}
+                            </li>
+                        );
+                    }
+                })}
             </ul>
         </PhaseContainer>
     );

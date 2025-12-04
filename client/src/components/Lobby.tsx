@@ -138,7 +138,6 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gam
         
   const validationColor = canStartGame ? '#4CAF50' : '#FF9800';
   const inLobby = gamePhase === 'LOBBY';
-  console.log(gamePhase)
 
   return (
     <div>
@@ -315,7 +314,6 @@ export const Lobby: React.FC = () => {
   // --- Listener for Private Role Assignment ---
   useEffect(() => {
       socket.on('roleAssigned', (data: { role: string, players: Player[] }) => {
-          console.log(`you were assigned role ${data.role}`)
           setMyRole(data.role); // Set the player's own role securely
       });
 
