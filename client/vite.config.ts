@@ -10,7 +10,7 @@ export default defineConfig({
         // ensuring the final value passed to JSON.stringify is a string or null/undefined.
         NODE_ENV: JSON.stringify(process.env.NODE_ENV ?? 'development'),
         REACT_APP_API_URL: JSON.stringify(process.env.REACT_APP_API_URL ?? ''),
-        REACT_APP_VERSION_SHA: JSON.stringify(process.env.REACT_APP_VERSION_SHA ?? 'foobar'),
+        REACT_APP_VERSION_SHA: JSON.stringify(process.env.REACT_APP_VERSION_SHA ?? 'foobar2'),
     },
   },
 })
