@@ -25,8 +25,14 @@ jobs:
       - name: Get Version Info
         id: get_version
         run: |
+          # --- DEBUGGING: Print the values to the console ---
+          echo "DEBUG: Setting VERSION_SHA..."
+          echo $(echo $GITHUB_SHA | cut -c1-7)
+          echo "DEBUG: Setting VERSION_RUN_ID..."
+          echo $GITHUB_RUN_ID
           echo "VERSION_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
           echo "VERSION_RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
+        shell: /usr/bin/bash -e {0}
       - name: Build App
         run: |
           # Inject the API URL and the VERSION_SHA into the build
