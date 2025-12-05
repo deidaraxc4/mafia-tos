@@ -44,12 +44,119 @@ const NIGHT_WAKEUP_ORDER = [
 const ROLE_CONFIG = {
     "Doctor": {
         "alignment": "Town (Protective)",
-        "description": "Each night choose 1 player to heal. If they are attacked, they survive. You cannot heal yourself on consecutive nights."
+        "description": "Each night choose 1 player to heal. If they are attacked, they survive. You cannot heal yourself on consecutive nights.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Mayor": {
+        "alignment": "Town (Support)",
+        "description": "During the day you may reveal yourself as the Mayor. Once you do your votes count as 3, you may not be healed by the Doctor once revealed.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Transporter": {
+        "alignment": "Town (Support)",
+        "description": "Choose 2 people to transport at night, you may transport yourself. Transporting 2 people swaps all targets against them.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Escort": {
+        "alignment": "Town (Support)",
+        "description": "Distract someone each night, that person is unable to use their ability. If you target a serial killer they will attack you.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Medium": {
+        "alignment": "Town (Support)",
+        "description": "Reveal the role of one dead person at night. You may only use your ability 3 times.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Retributionist": {
+        "alignment": "Town (Support)",
+        "description": "Choose a person to revive at night. You may only use your ability once.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Bodyguard": {
+        "alignment": "Town (Protective)",
+        "description": "Protect 1 person from death at night. If your target is attacked, both you and the attacker will die instead. Your counterattack ignores night immunity.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Vigilante": {
+        "alignment": "Town (Killing)",
+        "description": "Choose to take justice in your own hands and shoot someone at night. If you shoot another Town member you will die of guilt the next day. You can only shoot your gun 3 times.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Veteran": {
+        "alignment": "Town (Killing)",
+        "description": "Decide if you go on alert at night. While on alert you cannot die at night, anyone who visits you at night while on alert will be shot. You can only go on alert 3 times. You are immune to role blocks.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Sheriff": {
+        "alignment": "Town (Investigative)",
+        "description": "Each night choose 1 player investigate. You will know if your target is suspicious (Mafia members or any Serial Killers or Werewolves on a full moon night), except for the Godfather.",
+        "goal": "Lynch every criminal and evildoer."
+    },
+    "Lookout": {
+        "alignment": "Town (Investigative)",
+        "description": "Each night choose 1 player to stake out. You will be notified of all players who visited that player's house that night.",
+        "goal": "Lynch every criminal and evildoer."
     },
     "Mafioso": {
         "alignment": "Mafia (Killing)",
-        "description": "Carry out the Godfather's orders, you may target a player each night to kill."
-    }
+        "description": "Carry out the Godfather's orders, you may target a player each night to kill.",
+        "goal": "Kill anyone who will not submit to the mafia."
+    },
+    "Godfather": {
+        "alignment": "Mafia (Killing)",
+        "description": "You have night immunity, you cannot be killed at night. If there is a Mafioso he will attack the target of your choosing otherwise you kill a target at night. You will not appear suspicious to the Sheriff.",
+        "goal": "Kill anyone who will not submit to the mafia."
+    },
+    "Consig": {
+        "alignment": "Mafia (Support)",
+        "description": "Check one person for their exact role each night. If there are no kill capable Mafia roles left you will become a Mafioso.",
+        "goal": "Kill anyone who will not submit to the mafia."
+    },
+    "Consort": {
+        "alignment": "Mafia (Support)",
+        "description": "Distract someone each night, they are unable to use their ability. If there are no kill capable Mafia roles left you will become a Mafioso.",
+        "goal": "Kill anyone who will not submit to the mafia."
+    },
+    "Framer": {
+        "alignment": "Mafia (Support)",
+        "description": "Choose someone to frame each night, if they are investigated they will appear as a member of the Mafia. If there are no kill capable Mafia roles left you will become a Mafioso.",
+        "goal": "Kill anyone who will not submit to the mafia."
+    },
+    "Blackmailer": {
+        "alignment": "Mafia (Support)",
+        "description": "Choose one person each night to blackmail, blackmailed targets can not talk during the day. If there are no kill capable Mafia roles left you will become a Mafioso.",
+        "goal": "Kill anyone who will not submit to the mafia."
+    },
+    "Werewolf": {
+        "alignment": "Neutral (Killing)",
+        "description": "Transform into a werewlf during the full moon (Even number nights). As a Werewolf you cannot be killed at night, you will attack your victim and anyone who visits them. Your attack goes through night immunity. You may choose to stay home and attack anyone who visits you.",
+        "goal": "Kill everyone (Town and Mafia and serial killer) who would oppose you."
+    },
+    "Serial Killer": {
+        "alignment": "Neutral (Killing)",
+        "description": "Kill someone each night, if you are role blocked you will attack the role blocker in addition to your target.",
+        "goal": "Kill everyone (Town and Mafia and Werewolf) who would oppose you."
+    },
+    "Executioner": {
+        "alignment": "Neutral (Evil)",
+        "description": "Trick the Town into lynching your target. If your target is killed at night you will become a Jester. Your target is always a Town member.",
+        "goal": "Get your target lynched at any cost."
+    },
+    "Jester": {
+        "alignment": "Neutral (Evil)",
+        "description": "Trick the Town into voting to lynch you. If you are lynched you may haunt one of your guilty voters the following night and kill them.",
+        "goal": "Get yourself lynched by any means necessary."
+    },
+    "Amnesiac": {
+        "alignment": "Neutral (Benign)",
+        "description": "Remember who you were by selecting a dead player and assuming their role. When you choose a role it will be announced to the Town the next day.",
+        "goal": "Remember who you were and complete that roles objective."
+    },
+    "Survivor": {
+        "alignment": "Neutral (Benign)",
+        "description": "Put on a bulletproof vest at night, protecting you from attacks. You can only use the bulletproof vest 3 times.",
+        "goal": "Live to the end of the game."
+    },
 }
 
 function generateRoomCode() {

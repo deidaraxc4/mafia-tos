@@ -35,13 +35,13 @@ export const GamePhaseScreen: React.FC<GamePhaseScreenProps> = ({ role, phase, a
                 <div style={{ padding: '10px', backgroundColor: '#3c3c5c', borderRadius: '5px', marginTop: '15px' }}>
                     <h4 style={{ color: '#FFEB3B', margin: '0 0 5px 0' }}>Your Role: {roleKey}</h4>
                     <p style={{ color: '#90CAF9', margin: '0 0 5px 0', fontWeight: 'bold' }}>
-                        Alignment: {info.alignment}
+                        <strong>Alignment:</strong> {info.alignment}
                     </p>
                     <p style={{ color: '#6bd7c9ff', margin: '0' }}>
-                        Abilities: {info.description}
+                        <strong>Abilities:</strong> {info.description}
                     </p>
-                    <p style={{ color: '#E0E0E0', margin: '0' }}>
-                        Goal: {info.goal}
+                    <p style={{ color: '#00c60aff', margin: '0' }}>
+                        <strong>Goal:</strong> {info.goal}
                     </p>
                 </div>
             )}
