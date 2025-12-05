@@ -34,10 +34,16 @@ jobs:
           echo "VERSION_RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
         shell: /usr/bin/bash -e {0}
       - name: Build App
+        env:
+          # Use secrets for the API URL
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+          
+          # Use the variable set in the previous step (Get Version Info)
+          REACT_APP_VERSION_SHA: ${{ env.VERSION_SHA }}
         run: |
-          # Inject the API URL and the VERSION_SHA into the build
-          REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }} \
-          REACT_APP_VERSION_SHA=${{ env.VERSION_SHA }} \
+          # Inject the API URL and the VERSION_SHA into the build maybe delete this
+          # REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }} \
+          # REACT_APP_VERSION_SHA=${{ env.VERSION_SHA }} \
           npm run build
         working-directory: ${{ github.workspace }}/client
       - name: Build And Deploy
