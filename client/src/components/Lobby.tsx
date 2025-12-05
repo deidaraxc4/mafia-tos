@@ -4,6 +4,7 @@ import { socket } from '../socket';
 import { PlayerListItem } from './PlayerListItem';
 import { GamePhaseScreen } from './GamePhaseScreen';
 import { GMGameScreen } from './GMGameScreen';
+import Footer from './Footer';
 
 const LobbyContainer = styled.div`
   display: flex;
@@ -491,6 +492,7 @@ export const Lobby: React.FC = () => {
         )}
         
       </LobbyCard>
+      <Footer />
     </LobbyContainer>
   );
 };
