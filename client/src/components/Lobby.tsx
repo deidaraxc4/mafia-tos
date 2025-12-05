@@ -128,7 +128,7 @@ interface GMViewProps {
   myNickname: string;
 }
 
-const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gamePhase, allPlayersWithRoles, handleStartGame, myNickname }) => {
+const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gamePhase, allPlayersWithRoles, handleStartGame }) => {
   const [newRole, setNewRole] = useState<Role>('Mayor');
   
   // Validation: Check if player count matches role count
@@ -197,7 +197,7 @@ const GMView: React.FC<GMViewProps> = ({ roomCode, players, roles, setRoles, gam
               onChange={(e) => setNewRole(e.target.value as Role)}
               style={{ padding: '10px', flexGrow: 1, backgroundColor: '#1a1a2e', color: 'white' }}
             >
-              {roleOptions.map((r, index) => {
+              {roleOptions.map((r) => {
                 return(<option key={r} value={r}>{r}</option>)
               })}
             </select>
