@@ -62,4 +62,5 @@ jobs:
           app-name: 'mafia-tos'
           slot-name: 'Production'
           package: .
+          app-directory: 'server' # where the app directory is located
           
