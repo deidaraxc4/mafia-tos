@@ -19,6 +19,9 @@ jobs:
         with:
           submodules: true
           lfs: false
+      - name: Install Dependencies
+        run: npm install
+        working-directory: ${{ github.workspace }}/client
       - name: Get Version Info
         id: get_version
         run: |
