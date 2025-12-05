@@ -39,9 +39,15 @@ jobs:
           VERSION_SHA: ${{ env.VERSION_SHA }}
         run: |
           echo $VERSION_SHA
+          echo $SECRET_API_URL
+
+          export REACT_APP_API_URL=$SECRET_API_URL
+          export REACT_APP_VERSION_SHA=$VERSION_SHA
+
+          echo $REACT_APP_API_URL
+          echo $REACT_APP_VERSION_SHA
+          echo "vars set"
           
-          REACT_APP_API_URL=$SECRET_API_URL \
-          REACT_APP_VERSION_SHA=$VERSION_SHA \
           npm run build
         working-directory: ${{ github.workspace }}/client
       - name: Build And Deploy
