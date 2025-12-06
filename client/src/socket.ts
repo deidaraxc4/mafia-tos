@@ -1,10 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 
 // const SOCKET_SERVER_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001'; 
-const SOCKET_SERVER_URL = "https://mafia-tos.azurewebsites.net/"
+// const SOCKET_SERVER_URL = "https://mafia-tos.azurewebsites.net/"
+const SOCKET_SERVER_URL = process.env.REACT_APP_API_URL
+const SOCKET_URL = SOCKET_SERVER_URL?.trim();
 console.log(`socket url is ${SOCKET_SERVER_URL}`)
 
-export const socket: Socket = io(SOCKET_SERVER_URL, {
+export const socket: Socket = io(SOCKET_URL, {
     // Optional configuration
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
