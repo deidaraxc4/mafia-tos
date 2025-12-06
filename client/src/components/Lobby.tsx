@@ -303,6 +303,16 @@ export const Lobby: React.FC = () => {
   // In a real app, this would be determined by the backend
   const isGM = view === 'create'; 
 
+  //remove this
+  const SOCKET_SERVER_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+  useEffect(() => {
+        console.log('--- ENV DEBUG START ---');
+        console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+        console.log('REACT_APP_VERSION_SHA:', process.env.REACT_APP_VERSION_SHA);
+        console.log('SOCKET_SERVER_URL (Result):', SOCKET_SERVER_URL);
+        console.log('--- ENV DEBUG END ---');
+    }, []);
+
   // --- Socket Event Handlers (Dynamic Player List) ---
   useEffect(() => {
     // Listener for when *any* player joins/leaves/updates in the current room

@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
           NODE_ENV: JSON.stringify(process.env.NODE_ENV ?? 'development'),
           // REACT_APP_API_URL: JSON.stringify(process.env.REACT_APP_API_URL ?? ''),
           REACT_APP_API_URL: JSON.stringify(
-                    process.env.REACT_APP_API_URL || env.REACT_APP_API_URL
+                    env.REACT_APP_API_URL || process.env.REACT_APP_API_URL
                 ),
           REACT_APP_VERSION_SHA: JSON.stringify(process.env.REACT_APP_VERSION_SHA ?? 'foobar3'),
       },
